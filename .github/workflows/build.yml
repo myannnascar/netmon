@@ -1,13 +1,17 @@
-name: Build netmon (APK)
+name: Build and Release netmon (APK)
 
 on:
   push:
     branches: [ master, main ]
+    tags:
+      - 'v*' 
   workflow_dispatch: 
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,47 +31,45 @@ jobs:
           mkdir sdk && tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
           
           cd sdk
-
           mkdir -p package/custom
           ln -s ../../../netmon/netmon-core package/custom/netmon-core
           ln -s ../../../netmon/luci-app-netmon package/custom/luci-app-netmon
           
-
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Compile Packages
         run: |
           cd sdk
-
           make defconfig || true
           
-
           make package/custom/netmon-core/prepare V=s
           
-          echo "Starting compilation for netmon-core..."
+          echo "Compiling netmon-core..."
           make package/custom/netmon-core/compile V=s
           
-          echo "Starting compilation for luci-app-netmon..."
+          echo "Compiling luci-app-netmon..."
           make package/custom/luci-app-netmon/compile V=s
 
       - name: Prepare Artifacts
         run: |
-
           mkdir -p bin_out
-          
-
           find sdk/bin/packages/ -name "netmon-core*.apk" -exec cp {} bin_out/ \;
           find sdk/bin/packages/ -name "luci-app-netmon*.apk" -exec cp {} bin_out/ \;
           find sdk/bin/packages/ -name "luci-i18n-netmon-zh-cn*.apk" -exec cp {} bin_out/ \;
           
-          echo "Files collected for upload:"
+          echo "Final APK files:"
           ls -lh bin_out/
 
-      - name: Upload Artifacts
+      - name: Upload to Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: netmon-apk-v25.12.3
+          path: bin_out/ 
 
-          path: bin_out/*.apk
-          if-no-files-found: error
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') 
+        with:
+          files: bin_out/*.apk 
+          generate_release_notes: true 
