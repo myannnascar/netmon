@@ -27,31 +27,30 @@ jobs:
           mkdir sdk && tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
           
           cd sdk
-          # 手动建立软链接到自定义目录
+          # 手动将插件链接到 package/ 下的 custom 目录
           mkdir -p package/custom
           ln -s ../../../netmon/netmon-core package/custom/netmon-core
           ln -s ../../../netmon/luci-app-netmon package/custom/luci-app-netmon
           
-          # 更新并安装所有 feeds。这一步会将 libubox 等基础库的编译规则拉取到本地
+          # 更新 feeds，确保基础库逻辑存在
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Compile Dependencies and Plugin
+      - name: Compile Packages
         run: |
           cd sdk
-          # 生成 .config 文件，这一步会根据你的 Makefile DEPENDS 自动选中依赖库
+          # 1. 生成基础配置 (忽略 Kconfig 递归报错)
           make defconfig || true
           
-          # 核心修复：强制编译依赖项。这不会编译整个系统，
-          # 而是将 libubox, libubus 等头文件安装到 staging_dir 中
-          echo "Preparing build environment for dependencies..."
-          make package/libubox/compile V=s -j$(nproc)
-          make package/libubus/compile V=s -j$(nproc)
-          make package/libjson-c/compile V=s -j$(nproc)
+          # 2. 预下载所有依赖包的源码并准备环境
+          # 这步会自动处理 libubox, libubus 等依赖的头文件
+          make package/custom/netmon-core/prepare V=s
           
           echo "Starting compilation for netmon-core..."
-          # 现在环境已经就绪，再次尝试编译插件
           make package/custom/netmon-core/compile V=s
+          
+          echo "Starting compilation for luci-app-netmon..."
+          make package/custom/luci-app-netmon/compile V=s
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
