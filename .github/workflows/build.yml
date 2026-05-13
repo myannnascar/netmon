@@ -28,7 +28,7 @@ jobs:
           tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
           
           cd sdk
-          
+
           echo "src-link custom ../netmon-repo" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
@@ -36,14 +36,20 @@ jobs:
       - name: Compile Packages
         run: |
           cd sdk
-          make defconfig
-         
-          make package/netmon-core/compile V=s
-          make package/luci-app-netmon/compile V=s
+
+          make defconfig || true
+          
+          echo "Starting compilation for netmon-core..."
+
+          make package/feeds/custom/netmon-core/compile V=s
+          
+          echo "Starting compilation for luci-app-netmon..."
+          make package/feeds/custom/luci-app-netmon/compile V=s
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: netmon-apk-v25.12.3
-         
-          path: sdk/bin/packages/x86_64/custom/*.apk
+
+          path: |
+            sdk/bin/packages/x86_64/custom/*.apk
