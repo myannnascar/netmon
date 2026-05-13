@@ -1,0 +1,65 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+USE_PROCD=1
+
+generate_nft_rules() {
+    cat <<EOF > /tmp/netmon.nft
+table inet netmon {
+    set v4_up { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 1024; counter; }
+    set v4_down { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 1024; counter; }
+    set v6_up { type ipv6_addr; flags dynamic, timeout; timeout 1h; size 1024; counter; }
+    set v6_down { type ipv6_addr; flags dynamic, timeout; timeout 1h; size 1024; counter; }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        
+        iifname "br-lan" oifname != "br-lan" ip saddr != 0.0.0.0 update @v4_up { ip saddr counter }
+        iifname "br-lan" oifname != "br-lan" ip6 saddr != :: ip6 saddr != fe80::/10 ip6 saddr != ff00::/8 update @v6_up { ip6 saddr counter }
+
+        iifname != "br-lan" oifname "br-lan" ip daddr != 0.0.0.0 update @v4_down { ip daddr counter }
+        iifname != "br-lan" oifname "br-lan" ip6 daddr != :: ip6 daddr != fe80::/10 ip6 daddr != ff00::/8 update @v6_down { ip6 daddr counter }
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+        oifname "br-lan" fib saddr type != local ip daddr != 0.0.0.0 update @v4_down { ip daddr counter }
+        oifname "br-lan" fib saddr type != local ip6 daddr != :: ip6 daddr != fe80::/10 ip6 daddr != ff00::/8 update @v6_down { ip6 daddr counter }
+    }
+}
+EOF
+}
+
+DB_FILE="/etc/netmon/netmon.db"
+
+start_service() {
+	config_load netmon
+	local enabled
+	config_get_bool enabled main enabled 1
+	[ "$enabled" -eq 0 ] && return
+
+	[ -d "/etc/netmon" ] || mkdir -p /etc/netmon
+	
+	sed -i '/netmon do_snapshot/d' /etc/crontabs/root 2>/dev/null
+	/etc/init.d/cron restart
+
+	generate_nft_rules
+	/usr/sbin/nft delete table inet netmon 2>/dev/null
+	/usr/sbin/nft -f /tmp/netmon.nft
+	
+	procd_open_instance
+	procd_set_param command /usr/bin/netmon
+	procd_set_param respawn
+	procd_set_param term_timeout 10
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+stop_service() {
+	sed -i '/netmon do_snapshot/d' /etc/crontabs/root 2>/dev/null
+	/etc/init.d/cron restart
+}
+
+service_triggers() {
+	procd_add_reload_trigger "netmon"
+}

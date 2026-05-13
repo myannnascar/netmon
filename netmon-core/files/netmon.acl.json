@@ -1,0 +1,11 @@
+{
+	"netmon": {
+		"methods": {
+			"traffic": [ "read" ],
+			"history": [ "read" ],
+			"baseline": [ "read" ],
+			"clear": [ "write" ]
+		},
+		"scope": "ubus"
+	}
+}

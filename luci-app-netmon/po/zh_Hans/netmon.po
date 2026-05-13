@@ -1,0 +1,140 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Hostname"
+msgstr "主机名"
+
+msgid "IP Address"
+msgstr "IP 地址"
+
+msgid "Upload"
+msgstr "上行"
+
+msgid "Download"
+msgstr "下行"
+
+msgid "Period up"
+msgstr "周期上行"
+
+msgid "Period down"
+msgstr "周期下行"
+
+msgid "Online"
+msgstr "在线"
+
+msgid "Upload speed"
+msgstr "上行速率"
+
+msgid "Download speed"
+msgstr "下行速率"
+
+msgid "Network Monitor"
+msgstr "网络监控"
+
+msgid "Overview"
+msgstr "概览"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Netmon"
+msgstr "网络监控"
+
+msgid "Service and stats period."
+msgstr "服务开关与统计周期。"
+
+msgid "General Settings"
+msgstr "常规"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Runs traffic accounting."
+msgstr "开启后统计流量。"
+
+msgid "Stats period"
+msgstr "统计周期"
+
+msgid "Rolling window for period totals."
+msgstr "周期总用量按此时间窗滚动计算。"
+
+msgid "Daily"
+msgstr "每天"
+
+msgid "Weekly"
+msgstr "每周"
+
+msgid "Monthly"
+msgstr "每月"
+
+msgid "Yearly"
+msgstr "每年"
+
+msgid "Unknown"
+msgstr "未知"
+
+msgid "Service disabled"
+msgstr "服务已关闭"
+
+msgid "Data Management"
+msgstr "数据"
+
+msgid "Clear stats"
+msgstr "清除统计"
+
+msgid "Erase counters and history."
+msgstr "清空计数与历史。"
+
+msgid "Erase"
+msgstr "清除"
+
+msgid "Erase all statistics? This cannot be undone."
+msgstr "确定清空全部统计？不可恢复。"
+
+msgid "Statistics cleared."
+msgstr "已清空。"
+
+msgid "Clear failed: %s"
+msgstr "清除失败：%s"
+
+msgid "Collecting data..."
+msgstr "加载中…"
+
+msgid "No online hosts"
+msgstr "无在线主机"
+
+msgid "Traffic overview"
+msgstr "流量概览"
+
+msgid "Online hosts only; 1 s refresh. Period totals follow the stats interval in Settings. Full host list (including offline): Statistics."
+msgstr "仅在线主机；每秒刷新。周期用量遵循「设置」中的统计区间。含离线的完整清单见「统计」。"
+
+msgid "Traffic statistics"
+msgstr "流量统计"
+
+msgid "All hosts; 60 s refresh; no throughput columns. Totals follow the stats interval in Settings."
+msgstr "全部主机；60 秒刷新；无吞吐列。用量按「设置」中的统计区间。"
+
+msgid "No MAC for this host"
+msgstr "该主机无 MAC，无法设置别名"
+
+msgid "Alias saved: %s"
+msgstr "已保存别名：%s"
+
+msgid "Alias save failed (%s): %s"
+msgstr "保存别名失败（%s）：%s"
+
+msgid "Alias"
+msgstr "别名"
+
+msgid "%s · %s"
+msgstr "%s · %s"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Randomized"
+msgstr "随机 MAC"

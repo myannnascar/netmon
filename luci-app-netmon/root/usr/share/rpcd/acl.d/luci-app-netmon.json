@@ -1,0 +1,23 @@
+{
+	"luci-app-netmon": {
+		"description": "Grant access to netmon statistics and settings",
+		"read": {
+			"ubus": {
+				"netmon": [ "traffic", "history", "baseline" ],
+				"luci-rpc": [ "getHostHints" ],
+				"uci": [ "get" ]
+			},
+			"uci": [ "netmon" ],
+			"file": {
+				"/tmp/dhcp.leases": [ "read" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"netmon": [ "clear" ],
+				"uci": [ "set", "commit", "add", "delete" ]
+			},
+			"uci": [ "netmon" ]
+		}
+	}
+}

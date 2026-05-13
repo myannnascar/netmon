@@ -1,0 +1,551 @@
+.netmon-app {
+	--netmon-radius: 12px;
+	--netmon-radius-sm: 8px;
+	--netmon-radius-xs: 6px;
+	--netmon-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 26px rgba(15, 23, 42, 0.07);
+	--netmon-shadow-hover: 0 4px 10px rgba(15, 23, 42, 0.08), 0 18px 36px rgba(15, 23, 42, 0.1);
+	--netmon-border: var(--border-color-medium, rgba(15, 23, 42, 0.1));
+	--netmon-border-soft: var(--border-color-low, rgba(15, 23, 42, 0.07));
+	--netmon-surface: var(--background-color-high, #fff);
+	--netmon-surface-soft: var(--background-color-low, #f8fafc);
+	--netmon-muted: var(--text-color-secondary, #64748b);
+	--netmon-text: var(--text-color-high, #172033);
+	--netmon-accent: var(--cbi-color-primary, #2563eb);
+	--netmon-up: #2563eb;
+	--netmon-down: #059669;
+	--netmon-online: #0d9488;
+	color: var(--netmon-text);
+}
+
+.netmon-page-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 14px;
+	margin: 0 0 1rem 0;
+	padding-bottom: 0.85rem;
+	border-bottom: 1px solid var(--netmon-border-soft);
+}
+
+.netmon-title {
+	font-size: 1.36rem;
+	font-weight: 700;
+	letter-spacing: 0;
+	color: var(--netmon-text);
+	margin: 0 0 0.35rem 0;
+	line-height: 1.25;
+}
+
+.netmon-lede {
+	font-size: 0.875rem;
+	line-height: 1.55;
+	color: var(--netmon-muted);
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 760px;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	word-break: normal;
+	overflow-wrap: break-word;
+}
+
+.netmon-lede-empty {
+	display: none;
+}
+
+.netmon-metric-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+	gap: 12px;
+	margin: 0 0 1rem 0;
+}
+
+.netmon-metric {
+	position: relative;
+	box-sizing: border-box;
+	border-radius: var(--netmon-radius);
+	padding: 14px 15px;
+	min-height: 86px;
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0)),
+		var(--netmon-surface);
+	border: 1px solid var(--netmon-border);
+	box-shadow: var(--netmon-shadow);
+	overflow: hidden;
+	transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.netmon-metric:hover {
+	border-color: var(--netmon-border);
+	border-color: color-mix(in srgb, var(--netmon-metric-tone, var(--netmon-accent)) 34%, var(--netmon-border));
+	box-shadow: var(--netmon-shadow-hover);
+	transform: translateY(-1px);
+}
+
+.netmon-metric::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	background: var(--netmon-metric-tone, var(--netmon-accent));
+}
+
+.netmon-metric-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 9px;
+}
+
+.netmon-metric-label {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--netmon-muted);
+	line-height: 1.3;
+}
+
+.netmon-metric-glyph {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 999px;
+	background: rgba(37, 99, 235, 0.08);
+	background: color-mix(in srgb, var(--netmon-metric-tone, var(--netmon-accent)) 12%, transparent);
+	color: var(--netmon-metric-tone, var(--netmon-accent));
+	font-size: 0.9rem;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.netmon-metric-value {
+	font-size: 1.38rem;
+	font-weight: 750;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.18;
+	color: var(--netmon-text);
+	word-break: break-word;
+}
+
+.netmon-section-card {
+	border-radius: var(--netmon-radius);
+	border: 1px solid var(--netmon-border);
+	background: var(--netmon-surface-soft);
+	padding: 6px;
+	overflow-x: auto;
+	box-shadow: var(--netmon-shadow);
+}
+
+.netmon-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 10px;
+	padding: 2px 2px 8px 2px;
+}
+
+.netmon-filter {
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: 1 1 auto;
+	max-width: 360px;
+	min-width: 180px;
+	margin: 0;
+}
+
+.netmon-filter-icon {
+	position: absolute;
+	left: 11px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--netmon-muted);
+	font-size: 0.95rem;
+	line-height: 1;
+	pointer-events: none;
+}
+
+.netmon-filter-input {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 32px;
+	border-radius: var(--netmon-radius-xs);
+	border: 1px solid var(--netmon-border);
+	background: var(--netmon-surface);
+	color: var(--netmon-text);
+	padding: 6px 10px 6px 32px;
+	font-size: 0.86rem;
+	line-height: 1.35;
+	outline: none;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.netmon-filter-input:focus {
+	border-color: rgba(37, 99, 235, 0.45);
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.netmon-table {
+	table-layout: fixed;
+	width: 100%;
+	min-width: 720px;
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: var(--netmon-radius-sm);
+	overflow: hidden;
+	background: var(--netmon-surface);
+}
+
+.netmon-table tr.table-titles th {
+	padding: 12px 12px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--netmon-muted);
+	background: var(--netmon-surface-soft);
+	border-bottom: 1px solid var(--netmon-border);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.netmon-table th.netmon-th-sort {
+	cursor: pointer;
+	user-select: none;
+	transition: color 0.15s ease, background 0.15s ease;
+}
+
+.netmon-table tr.table-titles th:hover {
+	color: var(--netmon-text);
+	background: var(--netmon-surface-soft);
+	background: color-mix(in srgb, var(--netmon-accent) 8%, var(--netmon-surface-soft));
+}
+
+.netmon-table tr.tr:not(.table-titles) td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--netmon-border-soft);
+	font-size: 0.94rem;
+	vertical-align: middle;
+	background: var(--netmon-surface);
+	transition: background 0.15s ease;
+}
+
+.netmon-table tr.tr:not(.table-titles):last-child td {
+	border-bottom: none;
+}
+
+.netmon-table tr.tr:not(.table-titles):hover td {
+	background: var(--netmon-surface-soft);
+	background: color-mix(in srgb, var(--netmon-accent) 5%, var(--netmon-surface));
+}
+
+.netmon-table tr.netmon-row-offline td {
+	opacity: 0.58;
+}
+
+.netmon-table tr.netmon-row-offline:hover td {
+	opacity: 0.82;
+}
+
+.netmon-col-host {
+	width: 28%;
+}
+
+.netmon-col-ip {
+	width: 22%;
+}
+
+.netmon-col-number {
+	width: 12.5%;
+	text-align: right;
+}
+
+.netmon-table-stats .netmon-col-host {
+	width: 36%;
+}
+
+.netmon-table-stats .netmon-col-ip {
+	width: 26%;
+}
+
+.netmon-table-stats .netmon-col-number {
+	width: 19%;
+}
+
+.netmon-sort-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	margin-left: 5px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 800;
+	color: var(--netmon-muted);
+	opacity: 0.78;
+	vertical-align: middle;
+}
+
+.netmon-sort-icon.netmon-sort-active {
+	opacity: 1;
+	color: var(--netmon-accent);
+	background: rgba(37, 99, 235, 0.08);
+	background: color-mix(in srgb, var(--netmon-accent) 10%, transparent);
+}
+
+.netmon-cell-num {
+	font-variant-numeric: tabular-nums;
+	word-break: break-all;
+}
+
+.netmon-cell-up {
+	text-align: right;
+	color: var(--netmon-up);
+}
+
+.netmon-cell-down {
+	text-align: right;
+	color: var(--netmon-down);
+}
+
+.netmon-cell-total {
+	text-align: right;
+	color: var(--netmon-text);
+}
+
+.netmon-arrow-up,
+.netmon-arrow-down {
+	font-weight: 800;
+	margin-right: 2px;
+}
+
+.netmon-arrow-up {
+	color: var(--netmon-up);
+}
+
+.netmon-arrow-down {
+	color: var(--netmon-down);
+}
+
+.netmon-host-name {
+	overflow: visible;
+	text-overflow: unset;
+	white-space: normal;
+	word-break: break-word;
+	max-width: none;
+	line-height: 1.35;
+}
+
+.netmon-host-name strong {
+	font-weight: 750;
+	color: var(--netmon-text);
+}
+
+.netmon-name-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
+}
+
+.netmon-name-row {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	gap: 7px;
+}
+
+.netmon-host-meta {
+	display: inline-block;
+	margin-left: 6px;
+	color: var(--netmon-muted);
+	font-size: 0.82em;
+}
+
+.netmon-host-meta-line {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0;
+	color: var(--netmon-muted);
+	font-size: 0.8rem;
+	line-height: 1.35;
+}
+
+.netmon-host-meta-line > span {
+	display: inline-flex;
+	align-items: center;
+	max-width: 190px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.netmon-host-meta-line > span + span::before {
+	content: "·";
+	margin: 0 6px;
+	color: var(--netmon-muted);
+	opacity: 0.75;
+}
+
+.netmon-host-state-online {
+	color: var(--netmon-online);
+}
+
+.netmon-host-state-offline {
+	color: var(--netmon-muted);
+}
+
+.netmon-host-vendor {
+	color: var(--netmon-muted);
+}
+
+.netmon-host-random {
+	color: #b45309;
+}
+
+.netmon-alias-trigger {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
+	color: var(--netmon-muted);
+	background: transparent;
+	border: 1px solid transparent;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+	font-size: 0.82rem;
+	line-height: 1;
+}
+
+.netmon-name-row:hover .netmon-alias-trigger,
+.netmon-alias-trigger:focus {
+	opacity: 1;
+	outline: none;
+}
+
+.netmon-alias-trigger:hover,
+.netmon-alias-trigger:focus {
+	color: var(--netmon-accent);
+	background: rgba(37, 99, 235, 0.08);
+	background: color-mix(in srgb, var(--netmon-accent) 9%, transparent);
+	border-color: rgba(37, 99, 235, 0.18);
+	border-color: color-mix(in srgb, var(--netmon-accent) 22%, transparent);
+}
+
+.netmon-placeholder td {
+	text-align: center;
+	padding: 1.9rem 1rem !important;
+	color: var(--netmon-muted);
+	font-style: italic;
+}
+
+.netmon-settings .cbi-map {
+	margin-top: 0;
+}
+
+.netmon-settings .cbi-section {
+	margin-top: 1rem;
+	border-radius: var(--netmon-radius-sm);
+	border: 1px solid var(--netmon-border);
+	box-shadow: var(--netmon-shadow);
+	overflow: hidden;
+	background: var(--netmon-surface);
+}
+
+.netmon-settings .cbi-map {
+	background: transparent;
+	box-shadow: none;
+	border: none;
+	padding: 0;
+}
+
+.netmon-settings .cbi-section > h3 {
+	padding: 0.7rem 1rem;
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 700;
+	background: var(--netmon-surface-soft);
+	border-bottom: 1px solid var(--netmon-border);
+}
+
+.netmon-settings .cbi-section-node,
+.netmon-settings .cbi-value {
+	border-color: var(--netmon-border-soft);
+}
+
+.netmon-settings .cbi-value {
+	padding-top: 0.85rem;
+	padding-bottom: 0.85rem;
+}
+
+.netmon-settings .cbi-value-title {
+	font-weight: 650;
+	color: var(--netmon-text);
+}
+
+.netmon-settings .cbi-value-description {
+	color: var(--netmon-muted);
+	line-height: 1.45;
+}
+
+.netmon-settings .cbi-map > h2,
+.netmon-settings .cbi-map > .cbi-map-descr {
+	display: none;
+}
+
+.netmon-settings .cbi-section.netmon-danger-section,
+.netmon-settings .netmon-danger-section {
+	border-color: rgba(220, 38, 38, 0.22);
+}
+
+.netmon-settings .cbi-section.netmon-danger-section > h3,
+.netmon-settings .netmon-danger-section > h3 {
+	background: rgba(220, 38, 38, 0.06);
+	color: #991b1b;
+	border-bottom-color: rgba(220, 38, 38, 0.16);
+}
+
+@media (max-width: 720px) {
+	.netmon-page-head {
+		display: block;
+	}
+
+	.netmon-metric-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.netmon-table {
+		min-width: 620px;
+	}
+
+	.netmon-toolbar {
+		align-items: stretch;
+		padding: 4px 4px 9px 4px;
+	}
+
+	.netmon-filter {
+		max-width: none;
+		width: 100%;
+	}
+
+	.netmon-table tr.tr:not(.table-titles) td {
+		padding: 10px 9px;
+	}
+
+	.netmon-host-meta-line > span {
+		max-width: 140px;
+	}
+}
