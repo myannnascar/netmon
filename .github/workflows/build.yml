@@ -12,7 +12,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          path: 'netmon-repo' 
+          path: 'netmon'
 
       - name: Preparation
         run: |
@@ -24,29 +24,34 @@ jobs:
         run: |
           SDK_URL="https://downloads.openwrt.org/releases/25.12.3/targets/x86/64/openwrt-sdk-25.12.3-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
           wget -qO sdk.tar.zst $SDK_URL
-          mkdir sdk
-          tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
+          mkdir sdk && tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
           
           cd sdk
-          # 关键修改：手动强行建立软链接，直接把插件放入 SDK 的 package 目录
+          # 手动建立软链接到自定义目录
           mkdir -p package/custom
-          ln -s ../../../netmon-repo/netmon-core package/custom/netmon-core
-          ln -s ../../../netmon-repo/luci-app-netmon package/custom/luci-app-netmon
+          ln -s ../../../netmon/netmon-core package/custom/netmon-core
+          ln -s ../../../netmon/luci-app-netmon package/custom/luci-app-netmon
           
-          # 更新一下索引，确保 SDK 识别到这两个新加入的包
-          ./scripts/feeds update -i
+          # 更新并安装所有 feeds。这一步会将 libubox 等基础库的编译规则拉取到本地
+          ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Compile Packages
+      - name: Compile Dependencies and Plugin
         run: |
           cd sdk
-          # 1. 生成基础配置
+          # 生成 .config 文件，这一步会根据你的 Makefile DEPENDS 自动选中依赖库
           make defconfig || true
           
-          # 2. 直接针对手动创建的路径进行编译
-          echo "Starting compilation..."
+          # 核心修复：强制编译依赖项。这不会编译整个系统，
+          # 而是将 libubox, libubus 等头文件安装到 staging_dir 中
+          echo "Preparing build environment for dependencies..."
+          make package/libubox/compile V=s -j$(nproc)
+          make package/libubus/compile V=s -j$(nproc)
+          make package/libjson-c/compile V=s -j$(nproc)
+          
+          echo "Starting compilation for netmon-core..."
+          # 现在环境已经就绪，再次尝试编译插件
           make package/custom/netmon-core/compile V=s
-          make package/custom/luci-app-netmon/compile V=s
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
