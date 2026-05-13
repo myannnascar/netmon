@@ -28,39 +28,28 @@ jobs:
           tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
           
           cd sdk
-          # 建立软链接 feed
-          echo "src-link custom ../netmon-repo" >> feeds.conf.default
-          ./scripts/feeds update -a
+          # 关键修改：手动强行建立软链接，直接把插件放入 SDK 的 package 目录
+          mkdir -p package/custom
+          ln -s ../../../netmon-repo/netmon-core package/custom/netmon-core
+          ln -s ../../../netmon-repo/luci-app-netmon package/custom/luci-app-netmon
+          
+          # 更新一下索引，确保 SDK 识别到这两个新加入的包
+          ./scripts/feeds update -i
           ./scripts/feeds install -a
 
       - name: Compile Packages
         run: |
           cd sdk
-          # 1. 生成基础配置，忽略无关报错
+          # 1. 生成基础配置
           make defconfig || true
           
-          # 2. 动态获取插件在 SDK 中的实际路径（防止软链接层级导致硬编码路径失效）
-          CORE_TARGET=$(find package -name netmon-core -type d | head -n 1)
-          LUCI_TARGET=$(find package -name luci-app-netmon -type d | head -n 1)
-          
-          echo "Target Found: $CORE_TARGET"
-          echo "Target Found: $LUCI_TARGET"
-
-          # 3. 如果路径存在则执行编译
-          if [ -n "$CORE_TARGET" ]; then
-            make "${CORE_TARGET}/compile" V=s
-          else
-            echo "Error: netmon-core not found in package directory"
-            exit 1
-          fi
-
-          if [ -n "$LUCI_TARGET" ]; then
-            make "${LUCI_TARGET}/compile" V=s
-          fi
+          # 2. 直接针对手动创建的路径进行编译
+          echo "Starting compilation..."
+          make package/custom/netmon-core/compile V=s
+          make package/custom/luci-app-netmon/compile V=s
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: netmon-apk-v25.12.3
-          # 使用通配符递归查找所有生成的 .apk，避免路径层级微调导致上传失败
           path: sdk/bin/**/*.apk
