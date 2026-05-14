@@ -287,10 +287,13 @@ void update_nft_stats() {
 }
 
 static char ip_cache_buf[64];
+static char mac_cache_buf[18];
 
 struct neigh_entry {
     uint8_t family;
     uint8_t addr[16];
+    uint8_t mac[6];
+    uint8_t has_mac;
     uint8_t online;
 };
 
@@ -331,7 +334,9 @@ static int neigh_add_entry(struct neigh_ctx *ctx, int family, const void *addr, 
     struct neigh_entry *e = &ctx->entries[ctx->count++];
     e->family = (uint8_t)family;
     memset(e->addr, 0, sizeof(e->addr));
+    memset(e->mac, 0, sizeof(e->mac));
     memcpy(e->addr, addr, len);
+    e->has_mac = 0;
     e->online = is_online_state(state) ? 1 : 0;
     return MNL_CB_OK;
 }
@@ -352,7 +357,16 @@ static int neigh_parse_cb(const struct nlmsghdr *nlh, void *data) {
     if ((ndm->ndm_family == AF_INET && len != 4) || (ndm->ndm_family == AF_INET6 && len != 16))
         return MNL_CB_OK;
 
-    return neigh_add_entry(ctx, ndm->ndm_family, mnl_attr_get_payload(tb[NDA_DST]), len, ndm->ndm_state);
+    if (neigh_add_entry(ctx, ndm->ndm_family, mnl_attr_get_payload(tb[NDA_DST]), len, ndm->ndm_state) != MNL_CB_OK)
+        return MNL_CB_ERROR;
+
+    if (tb[NDA_LLADDR] && mnl_attr_get_payload_len(tb[NDA_LLADDR]) >= 6) {
+        struct neigh_entry *e = &ctx->entries[ctx->count - 1];
+        memcpy(e->mac, mnl_attr_get_payload(tb[NDA_LLADDR]), 6);
+        e->has_mac = 1;
+    }
+
+    return MNL_CB_OK;
 }
 
 static int read_neighbors(struct neigh_ctx *ctx) {
@@ -411,6 +425,22 @@ static int device_online(const struct neigh_ctx *ctx, const struct device_stat *
     return -1;
 }
 
+static const struct neigh_entry *find_neigh_entry(const struct neigh_ctx *ctx, const struct device_stat *dev) {
+    int len;
+    size_t i;
+
+    if (!ctx || !dev || !ctx->entries)
+        return NULL;
+
+    len = (dev->family == AF_INET) ? 4 : 16;
+    for (i = 0; i < ctx->count; i++) {
+        if (ctx->entries[i].family == dev->family && memcmp(ctx->entries[i].addr, dev->addr, len) == 0)
+            return &ctx->entries[i];
+    }
+
+    return NULL;
+}
+
 void dump_traffic_json(struct blob_buf *b) {
     uint64_t started_ms = monotonic_ms();
     struct neigh_ctx nctx = {0};
@@ -421,14 +451,21 @@ void dump_traffic_json(struct blob_buf *b) {
         inet_ntop(devices[i].family, devices[i].addr, ip_cache_buf, sizeof(ip_cache_buf));
 
         void *tbl = blobmsg_open_table(b, NULL);
+        const struct neigh_entry *entry = neigh_ok == 0 ? find_neigh_entry(&nctx, &devices[i]) : NULL;
         blobmsg_add_string(b, "ip", ip_cache_buf);
+        if (entry && entry->has_mac) {
+            snprintf(mac_cache_buf, sizeof(mac_cache_buf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                entry->mac[0], entry->mac[1], entry->mac[2],
+                entry->mac[3], entry->mac[4], entry->mac[5]);
+            blobmsg_add_string(b, "mac", mac_cache_buf);
+        }
         blobmsg_add_u64(b, "up_speed", devices[i].up_speed);
         blobmsg_add_u64(b, "down_speed", devices[i].down_speed);
         blobmsg_add_u64(b, "total_up", devices[i].total_up);
         blobmsg_add_u64(b, "total_down", devices[i].total_down);
 
-        if (neigh_ok == 0) {
-            int online = device_online(&nctx, &devices[i]);
+        if (entry) {
+            int online = entry->online ? 1 : 0;
             if (online >= 0)
                 blobmsg_add_u8(b, "online", (uint8_t)online);
         }

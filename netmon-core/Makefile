@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netmon-core
-PKG_VERSION:=1.0.1
+PKG_VERSION:=1.1.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=MYAN
@@ -26,10 +26,12 @@ define Package/netmon-core/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DIR) $(1)/etc/netmon
+	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/netmon $(1)/usr/bin/netmon
 	$(INSTALL_BIN) ./files/netmon.init $(1)/etc/init.d/netmon
 	$(INSTALL_CONF) ./files/netmon.config $(1)/etc/config/netmon
+	$(INSTALL_DATA) ./files/netmon.keep $(1)/lib/upgrade/keep.d/netmon-core
 	$(INSTALL_DATA) ./files/netmon.acl.json $(1)/usr/share/rpcd/acl.d/netmon.json
 endef
 

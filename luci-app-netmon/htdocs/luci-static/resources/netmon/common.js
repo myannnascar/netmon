@@ -267,18 +267,85 @@ function lookupVendorByMac(mac, vendorDb, legacyOui) {
 
 function buildSnapMap(baseRes) {
 	var snapMap = {};
+	var snapMacMap = {};
 	var bestSnap = (baseRes && baseRes.found && baseRes.baseline) ? baseRes.baseline : null;
 
 	if (bestSnap && bestSnap.devices) {
 		bestSnap.devices.forEach(function(d) {
 			snapMap[d.ip.toLowerCase()] = d;
+			if (d.mac)
+				snapMacMap[d.mac.toLowerCase()] = d;
 		});
 	}
 
 	return {
 		snapMap: snapMap,
+		snapMacMap: snapMacMap,
 		timestamp: bestSnap ? bestSnap.timestamp : 0
 	};
+}
+
+function preferDeviceIp(currentIp, candidateIp) {
+	if (!candidateIp)
+		return currentIp;
+
+	if (!currentIp)
+		return candidateIp;
+
+	if (currentIp.indexOf(':') !== -1 && candidateIp.indexOf('.') !== -1)
+		return candidateIp;
+
+	return currentIp;
+}
+
+function aggregateTrafficDevices(devices) {
+	var grouped = {};
+	var order = [];
+
+	(devices || []).forEach(function(dev) {
+		var ip = dev.ip;
+		var mac = dev.mac ? dev.mac.toLowerCase() : '';
+		var key = mac ? ('mac:' + mac) : ('ip:' + String(ip || '').toLowerCase());
+		var item = grouped[key];
+
+		if (!item) {
+			item = {
+				ip: ip,
+				mac: dev.mac || null,
+				up_speed: 0,
+				up_speed_v4: 0,
+				up_speed_v6: 0,
+				down_speed: 0,
+				down_speed_v4: 0,
+				down_speed_v6: 0,
+				total_up: 0,
+				total_down: 0,
+				online: false
+			};
+			grouped[key] = item;
+			order.push(key);
+		}
+
+		item.ip = preferDeviceIp(item.ip, ip);
+		item.up_speed += Number(dev.up_speed) || 0;
+		item.down_speed += Number(dev.down_speed) || 0;
+		item.total_up += Number(dev.total_up) || 0;
+		item.total_down += Number(dev.total_down) || 0;
+		item.online = item.online || !!dev.online;
+
+		if (String(ip || '').indexOf(':') !== -1) {
+			item.up_speed_v6 += Number(dev.up_speed) || 0;
+			item.down_speed_v6 += Number(dev.down_speed) || 0;
+		}
+		else {
+			item.up_speed_v4 += Number(dev.up_speed) || 0;
+			item.down_speed_v4 += Number(dev.down_speed) || 0;
+		}
+	});
+
+	return order.map(function(key) {
+		return grouped[key];
+	});
 }
 
 function getVendorInfo(mac, hostname, vendorDb, ouiDb, hostRules) {
@@ -332,14 +399,18 @@ function buildDevices(opts) {
 		return maps.hostMap[normIp] || null;
 	};
 
-	return (trafficData.devices || []).filter(function(dev) {
+	var getHostnameByMac = function(mac) {
+		var hint = mac ? hostHints[mac] || hostHints[mac.toLowerCase()] || hostHints[mac.toUpperCase()] : null;
+		return hint && hint.name ? hint.name : null;
+	};
+
+	return aggregateTrafficDevices(trafficData.devices || []).filter(function(dev) {
 		return isDisplayableIP(dev.ip);
 	}).map(function(dev) {
 		var lowerIp = dev.ip.toLowerCase();
 		var normIp = (dev.ip.indexOf(':') !== -1) ? normalizeIPv6(dev.ip) : lowerIp;
-		var snap = baseline.snapMap[lowerIp] || (normIp !== lowerIp ? baseline.snapMap[normIp] : null);
-		var hostname = getHostname(dev.ip) || _('Unknown');
-		var mac = maps.ipToMac[lowerIp] || (normIp !== lowerIp ? maps.ipToMac[normIp] : null);
+		var mac = dev.mac || maps.ipToMac[lowerIp] || (normIp !== lowerIp ? maps.ipToMac[normIp] : null);
+		var hostname = getHostnameByMac(mac) || getHostname(dev.ip) || _('Unknown');
 
 		if (!mac) {
 			Object.keys(hostHints).forEach(function(m) {
@@ -350,6 +421,10 @@ function buildDevices(opts) {
 					mac = m;
 			});
 		}
+
+		var snap = mac ? baseline.snapMacMap[mac.toLowerCase()] : null;
+		if (!snap)
+			snap = baseline.snapMap[lowerIp] || (normIp !== lowerIp ? baseline.snapMap[normIp] : null);
 
 		var totalUp = dev.total_up;
 		var totalDown = dev.total_down;
@@ -373,7 +448,11 @@ function buildDevices(opts) {
 			vendor: vendorInfo.vendor,
 			isRandomized: !!vendorInfo.isRandom,
 			up_speed: dev.up_speed,
+			up_speed_v4: dev.up_speed_v4 || 0,
+			up_speed_v6: dev.up_speed_v6 || 0,
 			down_speed: dev.down_speed,
+			down_speed_v4: dev.down_speed_v4 || 0,
+			down_speed_v6: dev.down_speed_v6 || 0,
 			total_up: totalUp,
 			total_down: totalDown,
 			isOnline: isOnline

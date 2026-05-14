@@ -321,6 +321,34 @@
 	color: var(--netmon-text);
 }
 
+.netmon-rate-stack {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 4px;
+	max-width: 100%;
+}
+
+.netmon-rate-main {
+	line-height: 1.2;
+}
+
+.netmon-rate-sub {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 4px;
+	font-size: 0.74rem;
+	line-height: 1.2;
+	color: var(--netmon-muted);
+}
+
+.netmon-rate-chip {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
 .netmon-arrow-up,
 .netmon-arrow-down {
 	font-weight: 800;

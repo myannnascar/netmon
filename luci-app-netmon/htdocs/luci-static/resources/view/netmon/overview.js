@@ -135,11 +135,23 @@ return view.extend({
 				var rows = visibleDevices.map(function(item) {
 					var upSpeed = [
 						item.up_speed > 0 ? E('span', { 'class': 'netmon-arrow-up' }, '↑ ') : '',
-						netmon.formatSpeed(item.up_speed)
+						E('div', { 'class': 'netmon-rate-stack' }, [
+							E('div', { 'class': 'netmon-rate-main' }, netmon.formatSpeed(item.up_speed)),
+							(item.up_speed_v4 > 0 || item.up_speed_v6 > 0) ? E('div', { 'class': 'netmon-rate-sub' }, [
+								item.up_speed_v4 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.up_speed_v4)) : '',
+								item.up_speed_v6 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.up_speed_v6)) : ''
+							]) : ''
+						])
 					];
 					var downSpeed = [
 						item.down_speed > 0 ? E('span', { 'class': 'netmon-arrow-down' }, '↓ ') : '',
-						netmon.formatSpeed(item.down_speed)
+						E('div', { 'class': 'netmon-rate-stack' }, [
+							E('div', { 'class': 'netmon-rate-main' }, netmon.formatSpeed(item.down_speed)),
+							(item.down_speed_v4 > 0 || item.down_speed_v6 > 0) ? E('div', { 'class': 'netmon-rate-sub' }, [
+								item.down_speed_v4 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.down_speed_v4)) : '',
+								item.down_speed_v6 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.down_speed_v6)) : ''
+							]) : ''
+						])
 					];
 
 					return E('tr', { 'class': 'tr' }, [

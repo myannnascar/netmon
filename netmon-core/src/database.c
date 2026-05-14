@@ -2,10 +2,180 @@
 #include "database.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <libubox/blobmsg_json.h>
 
 static sqlite3 *db = NULL;
+
+struct aggregated_device {
+    char key[80];
+    char ip[64];
+    char mac[18];
+    uint8_t has_online;
+    uint8_t online;
+    uint64_t up_speed;
+    uint64_t down_speed;
+    uint64_t total_up;
+    uint64_t total_down;
+};
+
+static uint64_t get_blob_u64(struct blob_attr *attr)
+{
+    if (!attr)
+        return 0;
+
+    return blobmsg_type(attr) == BLOBMSG_TYPE_INT64 ? blobmsg_get_u64(attr) : blobmsg_get_u32(attr);
+}
+
+static int prefer_ip(const char *current_ip, const char *candidate_ip)
+{
+    if (!candidate_ip || !*candidate_ip)
+        return 0;
+
+    if (!current_ip || !*current_ip)
+        return 1;
+
+    if (strchr(current_ip, ':') && strchr(candidate_ip, '.'))
+        return 1;
+
+    return 0;
+}
+
+static struct aggregated_device *find_aggregated_device(struct aggregated_device *items, size_t count, const char *key)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (strcmp(items[i].key, key) == 0)
+            return &items[i];
+    }
+
+    return NULL;
+}
+
+static struct blob_attr *find_devices_attr(struct blob_attr *attr)
+{
+    struct blob_attr *cur;
+    int rem;
+
+    if (!attr)
+        return NULL;
+
+    if (blobmsg_type(attr) == BLOBMSG_TYPE_ARRAY && blobmsg_name(attr) && strcmp(blobmsg_name(attr), "devices") == 0)
+        return attr;
+
+    if (blobmsg_type(attr) != BLOBMSG_TYPE_TABLE)
+        return NULL;
+
+    blobmsg_for_each_attr(cur, attr, rem) {
+        struct blob_attr *found = find_devices_attr(cur);
+        if (found)
+            return found;
+    }
+
+    return NULL;
+}
+
+static int aggregate_devices_attr(struct blob_attr *devices_attr, struct blob_buf *b)
+{
+    static const struct blobmsg_policy policy[7] = {
+        { .name = "ip", .type = BLOBMSG_TYPE_STRING },
+        { .name = "mac", .type = BLOBMSG_TYPE_STRING },
+        { .name = "up_speed", .type = BLOBMSG_TYPE_UNSPEC },
+        { .name = "down_speed", .type = BLOBMSG_TYPE_UNSPEC },
+        { .name = "total_up", .type = BLOBMSG_TYPE_UNSPEC },
+        { .name = "total_down", .type = BLOBMSG_TYPE_UNSPEC },
+        { .name = "online", .type = BLOBMSG_TYPE_UNSPEC },
+    };
+    struct aggregated_device *items = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+    struct blob_attr *cur;
+    int rem;
+    void *arr;
+
+    if (!devices_attr)
+        return -1;
+
+    blobmsg_for_each_attr(cur, devices_attr, rem) {
+        struct blob_attr *tb[7] = {0};
+        const char *ip;
+        const char *mac = NULL;
+        char key[80];
+        struct aggregated_device *item;
+
+        if (blobmsg_parse(policy, 7, tb, blobmsg_data(cur), blobmsg_data_len(cur)) != 0 || !tb[0])
+            continue;
+
+        ip = blobmsg_get_string(tb[0]);
+        if (!ip || !*ip)
+            continue;
+
+        if (tb[1] && blobmsg_get_string(tb[1]) && *blobmsg_get_string(tb[1])) {
+            mac = blobmsg_get_string(tb[1]);
+            snprintf(key, sizeof(key), "mac:%s", mac);
+        } else {
+            snprintf(key, sizeof(key), "ip:%s", ip);
+        }
+
+        item = find_aggregated_device(items, count, key);
+        if (!item) {
+            struct aggregated_device *next;
+
+            if (count == cap) {
+                size_t next_cap = cap ? cap * 2 : 64;
+                next = realloc(items, next_cap * sizeof(*items));
+                if (!next) {
+                    free(items);
+                    return -1;
+                }
+                items = next;
+                cap = next_cap;
+            }
+
+            item = &items[count++];
+            memset(item, 0, sizeof(*item));
+            strncpy(item->key, key, sizeof(item->key) - 1);
+            strncpy(item->ip, ip, sizeof(item->ip) - 1);
+            if (mac)
+                strncpy(item->mac, mac, sizeof(item->mac) - 1);
+        } else if (prefer_ip(item->ip, ip)) {
+            strncpy(item->ip, ip, sizeof(item->ip) - 1);
+            item->ip[sizeof(item->ip) - 1] = '\0';
+        }
+
+        item->up_speed += get_blob_u64(tb[2]);
+        item->down_speed += get_blob_u64(tb[3]);
+        item->total_up += get_blob_u64(tb[4]);
+        item->total_down += get_blob_u64(tb[5]);
+
+        if (tb[6]) {
+            item->has_online = 1;
+            if (get_blob_u64(tb[6]) != 0)
+                item->online = 1;
+        }
+    }
+
+    arr = blobmsg_open_array(b, "devices");
+    for (size_t i = 0; i < count; i++) {
+        void *tbl = blobmsg_open_table(b, NULL);
+        blobmsg_add_string(b, "ip", items[i].ip);
+        if (items[i].mac[0] != '\0')
+            blobmsg_add_string(b, "mac", items[i].mac);
+        blobmsg_add_u64(b, "up_speed", items[i].up_speed);
+        blobmsg_add_u64(b, "down_speed", items[i].down_speed);
+        blobmsg_add_u64(b, "total_up", items[i].total_up);
+        blobmsg_add_u64(b, "total_down", items[i].total_down);
+        if (items[i].has_online)
+            blobmsg_add_u8(b, "online", items[i].online ? 1 : 0);
+        blobmsg_close_table(b, tbl);
+    }
+    blobmsg_close_array(b, arr);
+
+    free(items);
+    return 0;
+}
 
 int db_init(void) {
     int rc = sqlite3_open(NETMON_DB_PATH, &db);
@@ -75,6 +245,8 @@ int db_get_history(uint32_t start_time, struct blob_buf *b) {
 
     void *arr = blobmsg_open_array(b, "history");
     while (sqlite3_step(stmt) == SQLITE_ROW) {
+        struct blob_buf parsed = {0};
+        struct blob_attr *devices_attr = NULL;
         void *tbl = blobmsg_open_table(b, NULL);
         blobmsg_add_u32(b, "timestamp", (uint32_t)sqlite3_column_int64(stmt, 0));
         
@@ -83,14 +255,19 @@ int db_get_history(uint32_t start_time, struct blob_buf *b) {
             const char *json_start = strchr(json_str, '{');
             if (!json_start) json_start = strchr(json_str, '[');
             if (json_start) {
-                if (!blobmsg_add_json_from_string(b, json_start)) {
+                blobmsg_buf_init(&parsed);
+                if (!blobmsg_add_json_from_string(&parsed, json_start)) {
                     fprintf(stderr, "netmon: [DB] Failed to parse history JSON at timestamp %llu\n", 
                             (unsigned long long)sqlite3_column_int64(stmt, 0));
+                } else {
+                    devices_attr = find_devices_attr(parsed.head);
+                    aggregate_devices_attr(devices_attr, b);
                 }
             }
         }
         
         blobmsg_close_table(b, tbl);
+        blob_buf_free(&parsed);
     }
     blobmsg_close_array(b, arr);
 
@@ -100,6 +277,8 @@ int db_get_history(uint32_t start_time, struct blob_buf *b) {
 
 static int db_add_parsed_json(struct blob_buf *b, const char *json_str, uint32_t ts)
 {
+    struct blob_buf parsed = {0};
+    struct blob_attr *devices_attr = NULL;
     if (!b || !json_str) return -1;
 
     void *tbl = blobmsg_open_table(b, "baseline");
@@ -108,12 +287,21 @@ static int db_add_parsed_json(struct blob_buf *b, const char *json_str, uint32_t
     const char *json_start = strchr(json_str, '{');
     if (!json_start) json_start = strchr(json_str, '[');
     if (json_start) {
-        if (!blobmsg_add_json_from_string(b, json_start)) {
+        blobmsg_buf_init(&parsed);
+        if (!blobmsg_add_json_from_string(&parsed, json_start)) {
             fprintf(stderr, "netmon: [DB] Failed to parse baseline JSON at timestamp %u, deleting corrupted record\n", ts);
             char sql[128];
             snprintf(sql, sizeof(sql), "DELETE FROM traffic_history WHERE timestamp = %u;", ts);
             sqlite3_exec(db, sql, NULL, NULL, NULL);
             blobmsg_close_table(b, tbl);
+            blob_buf_free(&parsed);
+            return -1;
+        }
+
+        devices_attr = find_devices_attr(parsed.head);
+        if (aggregate_devices_attr(devices_attr, b) != 0) {
+            blobmsg_close_table(b, tbl);
+            blob_buf_free(&parsed);
             return -1;
         }
     } else {
@@ -126,6 +314,7 @@ static int db_add_parsed_json(struct blob_buf *b, const char *json_str, uint32_t
     }
 
     blobmsg_close_table(b, tbl);
+    blob_buf_free(&parsed);
     return 0;
 }
 
