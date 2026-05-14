@@ -59,15 +59,16 @@ jobs:
           echo "Compiling luci-app-netmon..."
           make package/custom/luci-app-netmon/compile V=s
 
-      - name: Prepare Artifacts (Rename with Arch)
+      - name: Prepare Artifacts (Only netmon packages)
         run: |
           mkdir -p bin_out
-          find sdk/bin/packages/ -name "*.apk" | while read file; do
+          find sdk/bin/packages/ -name "*netmon*.apk" | while read file; do
             filename=$(basename "$file")
             new_name="${filename%.apk}_${{ matrix.arch }}.apk"
             cp "$file" "bin_out/$new_name"
           done
-          echo "Final APK files:"
+          
+          echo "Checked APK files:"
           ls -lh bin_out/
 
       - name: Upload to Artifacts
@@ -81,6 +82,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') 
         with:
           files: bin_out/*.apk 
-          generate_release_notes: true 
+          generate_release_notes: ${{ matrix.arch == 'x86_64' }}
           append_body: true
-          tag_name: ${{ github.ref_name }}
