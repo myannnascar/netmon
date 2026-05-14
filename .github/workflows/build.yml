@@ -14,7 +14,6 @@ jobs:
   build:
     name: Build for ${{ matrix.arch }}
     runs-on: ubuntu-22.04
-    #
     permissions:
       contents: write
     strategy:
@@ -22,9 +21,11 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            sdk_url: "https://downloads.openwrt.org/releases/25.12.3/targets/x86/64/openwrt-sdk-25.12.3-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
+            sdk_url: "https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-sdk-25.12.4-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
           - arch: armv8
-            sdk_url: "https://downloads.openwrt.org/releases/25.12.3/targets/armsr/armv8/openwrt-sdk-25.12.3-armsr-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
+            sdk_url: "https://downloads.openwrt.org/releases/25.12.4/targets/armsr/armv8/openwrt-sdk-25.12.4-armsr-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
+          - arch: filogic
+            sdk_url: "https://downloads.openwrt.org/releases/25.12.4/targets/mediatek/filogic/openwrt-sdk-25.12.4-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
 
     steps:
       - name: Checkout Code
@@ -60,17 +61,19 @@ jobs:
           echo "Compiling luci-app-netmon..."
           make package/custom/luci-app-netmon/compile V=s
 
-      - name: Prepare Artifacts (Refined)
+      - name: Prepare Artifacts (Precise Filtering)
         run: |
           mkdir -p bin_out
-          find sdk/bin/packages/ -type f -regextype posix-extended -regex ".*(netmon-core|luci-app-netmon|libubox|libblobmsg-json).*\.apk" | while read file; do
+          
+          find sdk/bin/packages/ -type f -regextype posix-extended \
+            -regex ".*(netmon-core|luci-app-netmon|libubox[0-9]|libblobmsg-json[0-9]).*\.apk" | while read file; do
             filename=$(basename "$file")
             if [[ ! "$filename" == *"luci-i18n-"* ]]; then
               new_name="${filename%.apk}_${{ matrix.arch }}.apk"
               cp "$file" "bin_out/$new_name"
             fi
           done
-          
+
           if [ "${{ matrix.arch }}" = "x86_64" ]; then
             find sdk/bin/packages/ -name "luci-i18n-netmon-*.apk" -exec cp {} bin_out/ \;
           fi
@@ -90,5 +93,4 @@ jobs:
         with:
           files: bin_out/*.apk 
           generate_release_notes: ${{ matrix.arch == 'x86_64' }}
-          #
           append_body: true
