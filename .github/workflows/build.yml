@@ -54,10 +54,8 @@ jobs:
         run: |
           cd sdk
           make defconfig || true
-          
           echo "Compiling netmon-core..."
           make package/custom/netmon-core/compile V=s
-          
           echo "Compiling luci-app-netmon..."
           make package/custom/luci-app-netmon/compile V=s
 
@@ -69,8 +67,7 @@ jobs:
             new_name="${filename%.apk}_${{ matrix.arch }}.apk"
             cp "$file" "bin_out/$new_name"
           done
-          
-          echo "Final APK files with arch suffix:"
+          echo "Final APK files:"
           ls -lh bin_out/
 
       - name: Upload to Artifacts
@@ -86,3 +83,4 @@ jobs:
           files: bin_out/*.apk 
           generate_release_notes: true 
           append_body: true
+          tag_name: ${{ github.ref_name }}
