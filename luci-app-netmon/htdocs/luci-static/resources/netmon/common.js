@@ -89,9 +89,9 @@ function setText(id, text) {
 		el.textContent = text;
 }
 
-function makeMetric(id, label, tone, glyph) {
+function makeMetric(id, label, tone, glyph, extraClass) {
 	return E('div', {
-		'class': 'netmon-metric',
+		'class': 'netmon-metric' + (extraClass ? ' ' + extraClass : ''),
 		'style': '--netmon-metric-tone: ' + tone + ';'
 	}, [
 		E('div', { 'class': 'netmon-metric-top' }, [
@@ -298,56 +298,6 @@ function preferDeviceIp(currentIp, candidateIp) {
 	return currentIp;
 }
 
-function aggregateTrafficDevices(devices) {
-	var grouped = {};
-	var order = [];
-
-	(devices || []).forEach(function(dev) {
-		var ip = dev.ip;
-		var mac = dev.mac ? dev.mac.toLowerCase() : '';
-		var key = mac ? ('mac:' + mac) : ('ip:' + String(ip || '').toLowerCase());
-		var item = grouped[key];
-
-		if (!item) {
-			item = {
-				ip: ip,
-				mac: dev.mac || null,
-				up_speed: 0,
-				up_speed_v4: 0,
-				up_speed_v6: 0,
-				down_speed: 0,
-				down_speed_v4: 0,
-				down_speed_v6: 0,
-				total_up: 0,
-				total_down: 0,
-				online: false
-			};
-			grouped[key] = item;
-			order.push(key);
-		}
-
-		item.ip = preferDeviceIp(item.ip, ip);
-		item.up_speed += Number(dev.up_speed) || 0;
-		item.down_speed += Number(dev.down_speed) || 0;
-		item.total_up += Number(dev.total_up) || 0;
-		item.total_down += Number(dev.total_down) || 0;
-		item.online = item.online || !!dev.online;
-
-		if (String(ip || '').indexOf(':') !== -1) {
-			item.up_speed_v6 += Number(dev.up_speed) || 0;
-			item.down_speed_v6 += Number(dev.down_speed) || 0;
-		}
-		else {
-			item.up_speed_v4 += Number(dev.up_speed) || 0;
-			item.down_speed_v4 += Number(dev.down_speed) || 0;
-		}
-	});
-
-	return order.map(function(key) {
-		return grouped[key];
-	});
-}
-
 function getVendorInfo(mac, hostname, vendorDb, ouiDb, hostRules) {
 	var vendor = null;
 	var isRandom = false;
@@ -404,7 +354,7 @@ function buildDevices(opts) {
 		return hint && hint.name ? hint.name : null;
 	};
 
-	return aggregateTrafficDevices(trafficData.devices || []).filter(function(dev) {
+	return (trafficData.devices || []).filter(function(dev) {
 		return isDisplayableIP(dev.ip);
 	}).map(function(dev) {
 		var lowerIp = dev.ip.toLowerCase();
@@ -448,15 +398,73 @@ function buildDevices(opts) {
 			vendor: vendorInfo.vendor,
 			isRandomized: !!vendorInfo.isRandom,
 			up_speed: dev.up_speed,
-			up_speed_v4: dev.up_speed_v4 || 0,
-			up_speed_v6: dev.up_speed_v6 || 0,
 			down_speed: dev.down_speed,
-			down_speed_v4: dev.down_speed_v4 || 0,
-			down_speed_v6: dev.down_speed_v6 || 0,
 			total_up: totalUp,
 			total_down: totalDown,
 			isOnline: isOnline
 		};
+	});
+}
+
+function aggregateDevices(devices) {
+	var grouped = {};
+	var order = [];
+
+	(devices || []).forEach(function(item) {
+		var mac = item.mac ? item.mac.toLowerCase() : '';
+		var key = mac ? ('mac:' + mac) : ('ip:' + String(item.ip || '').toLowerCase());
+		var group = grouped[key];
+
+		if (!group) {
+			group = {
+				ip: item.ip,
+				mac: item.mac || null,
+				hostname: item.hostname,
+				alias: item.alias,
+				vendor: item.vendor,
+				isRandomized: item.isRandomized,
+				up_speed: 0,
+				down_speed: 0,
+				total_up: 0,
+				total_down: 0,
+				isOnline: false,
+				stackRows: []
+			};
+			grouped[key] = group;
+			order.push(key);
+		}
+
+		group.ip = preferDeviceIp(group.ip, item.ip);
+		if (!group.alias && item.alias)
+			group.alias = item.alias;
+		if ((group.hostname === _('Unknown') || !group.hostname) && item.hostname)
+			group.hostname = item.hostname;
+		if (!group.vendor && item.vendor)
+			group.vendor = item.vendor;
+		group.isRandomized = group.isRandomized || item.isRandomized;
+		group.isOnline = group.isOnline || item.isOnline;
+		group.up_speed += Number(item.up_speed) || 0;
+		group.down_speed += Number(item.down_speed) || 0;
+		group.total_up += Number(item.total_up) || 0;
+		group.total_down += Number(item.total_down) || 0;
+		group.stackRows.push({
+			ip: item.ip,
+			up_speed: item.up_speed,
+			down_speed: item.down_speed,
+			total_up: item.total_up,
+			total_down: item.total_down,
+			isIPv6: item.ip && item.ip.indexOf(':') !== -1
+		});
+	});
+
+	return order.map(function(key) {
+		var group = grouped[key];
+		group.stackRows.sort(function(a, b) {
+			if (!!a.isIPv6 !== !!b.isIPv6)
+				return a.isIPv6 ? 1 : -1;
+			return String(a.ip || '').localeCompare(String(b.ip || ''), undefined, { numeric: true });
+		});
+		return group;
 	});
 }
 
@@ -617,7 +625,8 @@ function makeHostCell(item, opts) {
 		'class': 'netmon-alias-trigger',
 		'tabindex': '0',
 		'role': 'button',
-		'title': _('Alias'),
+		'title': _('Edit alias'),
+		'aria-label': _('Edit alias'),
 		'click': function(ev) { ev.preventDefault(); openAliasPrompt(item); },
 		'keydown': function(ev) {
 			if (ev.key === 'Enter' || ev.key === ' ') {
@@ -625,7 +634,7 @@ function makeHostCell(item, opts) {
 				openAliasPrompt(item);
 			}
 		}
-	}, 'Edit');
+	}, '\u270E');
 
 	var metaItems = [];
 
@@ -672,6 +681,7 @@ return baseclass.extend({
 	makeHostCell: makeHostCell,
 	makeMetric: makeMetric,
 	prepareVendorDb: prepareVendorDb,
+	aggregateDevices: aggregateDevices,
 	replaceRows: replaceRows,
 	setText: setText,
 	showPlaceholder: showPlaceholder,

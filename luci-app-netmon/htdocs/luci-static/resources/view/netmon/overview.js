@@ -34,6 +34,20 @@ var currentSortCol = null;
 var currentSortDir = null;
 var currentFilter = '';
 
+function renderStack(values, className) {
+	return E('div', { 'class': className }, values.map(function(text) {
+		return E('span', { 'class': 'netmon-rate-chip' }, text);
+	}));
+}
+
+function neutralSortIcon() {
+	return '\u2195';
+}
+
+function activeSortIcon(dir) {
+	return dir === 'asc' ? '\u2191' : '\u2193';
+}
+
 return view.extend({
 	render: function() {
 		return Promise.all([
@@ -49,10 +63,10 @@ return view.extend({
 			var hostRules = ouidata.hostname || [];
 			var vendorDb = netmon.prepareVendorDb(ouidata);
 
-			var iconUp = E('span', { 'class': 'netmon-sort-icon' }, '↕');
-			var iconDown = E('span', { 'class': 'netmon-sort-icon' }, '↕');
-			var iconTotalUp = E('span', { 'class': 'netmon-sort-icon' }, '↕');
-			var iconTotalDown = E('span', { 'class': 'netmon-sort-icon' }, '↕');
+			var iconUp = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
+			var iconDown = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
+			var iconTotalUp = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
+			var iconTotalDown = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
 
 			var thHostname = E('th', { 'class': 'th netmon-th-sort netmon-col-host' }, _('Hostname'));
 			var thIp = E('th', { 'class': 'th netmon-col-ip' }, _('IP Address'));
@@ -62,9 +76,9 @@ return view.extend({
 			var thTotalDown = E('th', { 'class': 'th netmon-th-sort netmon-col-number' }, [ _('Period down'), iconTotalDown ]);
 
 			var summary = E('div', { 'class': 'netmon-metric-grid' }, [
-				netmon.makeMetric('netmon-online-count', _('Online'), '#0d9488', '●'),
-				netmon.makeMetric('netmon-up-speed', _('Upload speed'), '#2563eb', '↑'),
-				netmon.makeMetric('netmon-down-speed', _('Download speed'), '#059669', '↓')
+				netmon.makeMetric('netmon-online-count', _('Online'), '#0d9488', '\u25CF'),
+				netmon.makeMetric('netmon-up-speed', _('Upload speed'), '#2563eb', '\u2191', 'netmon-metric-up'),
+				netmon.makeMetric('netmon-down-speed', _('Download speed'), '#059669', '\u2193', 'netmon-metric-down')
 			]);
 			var latestDevices = [];
 			var applyFilter = function(ev) {
@@ -81,7 +95,7 @@ return view.extend({
 			});
 			var toolbar = E('div', { 'class': 'netmon-toolbar' }, [
 				E('label', { 'class': 'netmon-filter' }, [
-					E('span', { 'class': 'netmon-filter-icon' }, '⌕'),
+					E('span', { 'class': 'netmon-filter-icon' }, '\u2315'),
 					filterInput
 				])
 			]);
@@ -103,7 +117,7 @@ return view.extend({
 
 			function updateIcons() {
 				[ iconUp, iconDown, iconTotalUp, iconTotalDown ].forEach(function(i) {
-					i.textContent = '↕';
+					i.textContent = neutralSortIcon();
 					i.classList.remove('netmon-sort-active');
 				});
 
@@ -113,13 +127,14 @@ return view.extend({
 					currentSortCol === 'total_down' ? iconTotalDown : null;
 
 				if (target) {
-					target.textContent = currentSortDir === 'asc' ? '↑' : '↓';
+					target.textContent = activeSortIcon(currentSortDir);
 					target.classList.add('netmon-sort-active');
 				}
 			}
 
 			function renderRows(devices) {
-				var visibleDevices = netmon.sortDevices(netmon.filterDevices(devices, currentFilter), currentSortCol, currentSortDir);
+				var groupedDevices = netmon.aggregateDevices(devices);
+				var visibleDevices = netmon.sortDevices(netmon.filterDevices(groupedDevices, currentFilter), currentSortCol, currentSortDir);
 				var totalUpSpeed = 0;
 				var totalDownSpeed = 0;
 
@@ -128,39 +143,24 @@ return view.extend({
 					totalDownSpeed += Number(item.down_speed) || 0;
 				});
 
-				netmon.setText('netmon-online-count', currentFilter ? String(visibleDevices.length) + ' / ' + String(devices.length) : String(devices.length));
+				netmon.setText('netmon-online-count', currentFilter ? String(visibleDevices.length) + ' / ' + String(groupedDevices.length) : String(groupedDevices.length));
 				netmon.setText('netmon-up-speed', netmon.formatSpeed(totalUpSpeed));
 				netmon.setText('netmon-down-speed', netmon.formatSpeed(totalDownSpeed));
 
 				var rows = visibleDevices.map(function(item) {
-					var upSpeed = [
-						item.up_speed > 0 ? E('span', { 'class': 'netmon-arrow-up' }, '↑ ') : '',
-						E('div', { 'class': 'netmon-rate-stack' }, [
-							E('div', { 'class': 'netmon-rate-main' }, netmon.formatSpeed(item.up_speed)),
-							(item.up_speed_v4 > 0 || item.up_speed_v6 > 0) ? E('div', { 'class': 'netmon-rate-sub' }, [
-								item.up_speed_v4 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.up_speed_v4)) : '',
-								item.up_speed_v6 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.up_speed_v6)) : ''
-							]) : ''
-						])
-					];
-					var downSpeed = [
-						item.down_speed > 0 ? E('span', { 'class': 'netmon-arrow-down' }, '↓ ') : '',
-						E('div', { 'class': 'netmon-rate-stack' }, [
-							E('div', { 'class': 'netmon-rate-main' }, netmon.formatSpeed(item.down_speed)),
-							(item.down_speed_v4 > 0 || item.down_speed_v6 > 0) ? E('div', { 'class': 'netmon-rate-sub' }, [
-								item.down_speed_v4 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.down_speed_v4)) : '',
-								item.down_speed_v6 > 0 ? E('span', { 'class': 'netmon-rate-chip' }, netmon.formatSpeed(item.down_speed_v6)) : ''
-							]) : ''
-						])
-					];
+					var ipLines = item.stackRows.map(function(row) { return row.ip; });
+					var upLines = item.stackRows.map(function(row) { return netmon.formatSpeed(row.up_speed); });
+					var downLines = item.stackRows.map(function(row) { return netmon.formatSpeed(row.down_speed); });
+					var totalUpLines = item.stackRows.map(function(row) { return netmon.formatTraffic(row.total_up); });
+					var totalDownLines = item.stackRows.map(function(row) { return netmon.formatTraffic(row.total_down); });
 
 					return E('tr', { 'class': 'tr' }, [
 						E('td', { 'class': 'td' }, netmon.makeHostCell(item)),
-						E('td', { 'class': 'td netmon-cell-num' }, item.ip),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-up' }, upSpeed),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-down' }, downSpeed),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-total' }, netmon.formatTraffic(item.total_up)),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-total' }, netmon.formatTraffic(item.total_down))
+						E('td', { 'class': 'td netmon-cell-num' }, renderStack(ipLines, 'netmon-rate-sub netmon-ip-stack')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-up' }, renderStack(upLines, 'netmon-rate-sub')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-down' }, renderStack(downLines, 'netmon-rate-sub')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-up' }, renderStack(totalUpLines, 'netmon-rate-sub')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-down' }, renderStack(totalDownLines, 'netmon-rate-sub'))
 					]);
 				});
 

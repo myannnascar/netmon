@@ -34,6 +34,20 @@ var currentSortCol = null;
 var currentSortDir = null;
 var currentFilter = '';
 
+function renderStack(values, className) {
+	return E('div', { 'class': className }, values.map(function(text) {
+		return E('span', { 'class': 'netmon-rate-chip' }, text);
+	}));
+}
+
+function neutralSortIcon() {
+	return '\u2195';
+}
+
+function activeSortIcon(dir) {
+	return dir === 'asc' ? '\u2191' : '\u2193';
+}
+
 return view.extend({
 	render: function() {
 		return Promise.all([
@@ -49,8 +63,8 @@ return view.extend({
 			var hostRules = ouidata.hostname || [];
 			var vendorDb = netmon.prepareVendorDb(ouidata);
 
-			var iconTotalUp = E('span', { 'class': 'netmon-sort-icon' }, '↕');
-			var iconTotalDown = E('span', { 'class': 'netmon-sort-icon' }, '↕');
+			var iconTotalUp = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
+			var iconTotalDown = E('span', { 'class': 'netmon-sort-icon' }, neutralSortIcon());
 
 			var thHostname = E('th', { 'class': 'th netmon-th-sort netmon-col-host' }, _('Hostname'));
 			var thIp = E('th', { 'class': 'th netmon-col-ip' }, _('IP Address'));
@@ -78,7 +92,7 @@ return view.extend({
 			});
 			var toolbar = E('div', { 'class': 'netmon-toolbar' }, [
 				E('label', { 'class': 'netmon-filter' }, [
-					E('span', { 'class': 'netmon-filter-icon' }, '⌕'),
+					E('span', { 'class': 'netmon-filter-icon' }, '\u2315'),
 					filterInput
 				])
 			]);
@@ -93,7 +107,7 @@ return view.extend({
 
 			function updateIcons() {
 				[ iconTotalUp, iconTotalDown ].forEach(function(i) {
-					i.textContent = '↕';
+					i.textContent = neutralSortIcon();
 					i.classList.remove('netmon-sort-active');
 				});
 
@@ -101,19 +115,23 @@ return view.extend({
 					currentSortCol === 'total_down' ? iconTotalDown : null;
 
 				if (target) {
-					target.textContent = currentSortDir === 'asc' ? '↑' : '↓';
+					target.textContent = activeSortIcon(currentSortDir);
 					target.classList.add('netmon-sort-active');
 				}
 			}
 
 			function renderRows(devices) {
-				var visibleDevices = netmon.sortDevices(netmon.filterDevices(devices, currentFilter), currentSortCol, currentSortDir);
+				var visibleDevices = netmon.sortDevices(netmon.filterDevices(netmon.aggregateDevices(devices), currentFilter), currentSortCol, currentSortDir);
 				var rows = visibleDevices.map(function(item) {
+					var ipLines = item.stackRows.map(function(row) { return row.ip; });
+					var totalUpLines = item.stackRows.map(function(row) { return netmon.formatTraffic(row.total_up); });
+					var totalDownLines = item.stackRows.map(function(row) { return netmon.formatTraffic(row.total_down); });
+
 					return E('tr', { 'class': 'tr' + (item.isOnline ? '' : ' netmon-row-offline') }, [
 						E('td', { 'class': 'td' }, netmon.makeHostCell(item, { showStatus: true })),
-						E('td', { 'class': 'td netmon-cell-num' }, item.ip),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-up' }, netmon.formatTraffic(item.total_up)),
-						E('td', { 'class': 'td netmon-cell-num netmon-cell-down' }, netmon.formatTraffic(item.total_down))
+						E('td', { 'class': 'td netmon-cell-num' }, renderStack(ipLines, 'netmon-rate-sub netmon-ip-stack')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-up' }, renderStack(totalUpLines, 'netmon-rate-sub')),
+						E('td', { 'class': 'td netmon-cell-num netmon-cell-down' }, renderStack(totalDownLines, 'netmon-rate-sub'))
 					]);
 				});
 
