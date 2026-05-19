@@ -5,7 +5,6 @@ USE_PROCD=1
 
 LAN_NETWORKS=""
 LAN_IFACES=""
-EXTRA_IFACES=""
 
 append_lan_network() {
 	local network="$1"
@@ -28,20 +27,6 @@ append_lan_iface() {
 	case " $LAN_IFACES " in
 		*" $iface "*) ;;
 		*) LAN_IFACES="$LAN_IFACES $iface" ;;
-	esac
-}
-
-append_extra_iface() {
-	local iface="$1"
-	[ -n "$iface" ] || return
-
-	case "$iface" in
-		*@*) iface="${iface##*@}" ;;
-	esac
-
-	case " $EXTRA_IFACES " in
-		*" $iface "*) ;;
-		*) EXTRA_IFACES="$EXTRA_IFACES $iface" ;;
 	esac
 }
 
@@ -100,13 +85,6 @@ detect_lan_ifaces() {
 	[ -n "$LAN_IFACES" ] || LAN_IFACES=" br-lan"
 }
 
-detect_extra_ifaces() {
-	EXTRA_IFACES=""
-
-	config_load netmon
-	config_list_foreach main extra_iface append_extra_iface
-}
-
 format_ifaces() {
 	local ifaces="$1"
 	local iface out
@@ -118,20 +96,37 @@ format_ifaces() {
 	printf '%s' "$out"
 }
 
+chain_suffix() {
+	printf '%s' "$1" | sed 's/[^A-Za-z0-9_]/_/g'
+}
+
+append_lan_ingress_chains() {
+	local iface suffix
+
+	for iface in $LAN_IFACES; do
+		suffix="$(chain_suffix "$iface")"
+		ingress_chains="$ingress_chains
+
+    chain ingress_lan_$suffix {
+        type filter hook ingress device \"$iface\" priority 0; policy accept;
+        ip saddr != 0.0.0.0 update @v4_up { ip saddr counter }
+        ip6 saddr != :: ip6 saddr != fe80::/10 ip6 saddr != ff00::/8 update @v6_up { ip6 saddr counter }
+    }"
+	done
+}
+
 generate_nft_rules() {
-    local lan_ifaces extra_ifaces extra_rules
+    local lan_ifaces ingress_chains prerouting_rules
 
     detect_lan_ifaces
-    detect_extra_ifaces
     lan_ifaces="$(format_ifaces "$LAN_IFACES")"
-    extra_ifaces="$(format_ifaces "$EXTRA_IFACES")"
 
-    if [ -n "$extra_ifaces" ]; then
-        extra_rules="
-        oifname { $extra_ifaces } ip saddr != 0.0.0.0 update @v4_up { ip saddr counter }
-        oifname { $extra_ifaces } ip6 saddr != :: ip6 saddr != fe80::/10 ip6 saddr != ff00::/8 update @v6_up { ip6 saddr counter }
-        iifname { $extra_ifaces } ip daddr != 0.0.0.0 ip daddr != 255.255.255.255 ip daddr != 224.0.0.0/4 update @v4_down { ip daddr counter }
-        iifname { $extra_ifaces } ip6 daddr != :: ip6 daddr != fe80::/10 ip6 daddr != ff00::/8 update @v6_down { ip6 daddr counter }"
+    if [ "$1" != "0" ]; then
+        append_lan_ingress_chains
+    else
+        prerouting_rules="
+        iifname { $lan_ifaces } ip saddr != 0.0.0.0 update @v4_up { ip saddr counter }
+        iifname { $lan_ifaces } ip6 saddr != :: ip6 saddr != fe80::/10 ip6 saddr != ff00::/8 update @v6_up { ip6 saddr counter }"
     fi
 
     cat <<EOF > /tmp/netmon.nft
@@ -142,20 +137,15 @@ table inet netmon {
     set v6_down { type ipv6_addr; flags dynamic, timeout; timeout 1h; size 1024; counter; }
 
     chain prerouting {
-        type filter hook prerouting priority 0; policy accept;
-        iifname { $lan_ifaces } ip saddr != 0.0.0.0 update @v4_up { ip saddr counter }
-        iifname { $lan_ifaces } ip6 saddr != :: ip6 saddr != fe80::/10 ip6 saddr != ff00::/8 update @v6_up { ip6 saddr counter }
+        type filter hook prerouting priority raw; policy accept;
+        $prerouting_rules
     }
 
     chain postrouting {
         type filter hook postrouting priority 0; policy accept;
         oifname { $lan_ifaces } ip daddr != 0.0.0.0 ip daddr != 255.255.255.255 ip daddr != 224.0.0.0/4 update @v4_down { ip daddr counter }
         oifname { $lan_ifaces } ip6 daddr != :: ip6 daddr != fe80::/10 ip6 daddr != ff00::/8 update @v6_down { ip6 daddr counter }
-    }
-
-    chain proxied {
-        type filter hook forward priority 1; policy accept;$extra_rules
-    }
+    }$ingress_chains
 }
 EOF
 }
@@ -173,12 +163,17 @@ start_service() {
 	sed -i '/netmon do_snapshot/d' /etc/crontabs/root 2>/dev/null
 	/etc/init.d/cron restart
 
-	generate_nft_rules
-	if ! /usr/sbin/nft -c -f /tmp/netmon.nft; then
-		logger -t netmon "failed to validate nft rules"
-		return 1
-	fi
+	generate_nft_rules 1
 	/usr/sbin/nft delete table inet netmon 2>/dev/null
+	if ! /usr/sbin/nft -c -f /tmp/netmon.nft; then
+		logger -t netmon "failed to validate nft ingress rules, retrying without ingress"
+		generate_nft_rules 0
+		/usr/sbin/nft delete table inet netmon 2>/dev/null
+		if ! /usr/sbin/nft -c -f /tmp/netmon.nft; then
+			logger -t netmon "failed to validate nft rules"
+			return 1
+		fi
+	fi
 	if ! /usr/sbin/nft -f /tmp/netmon.nft; then
 		logger -t netmon "failed to load nft rules"
 		return 1

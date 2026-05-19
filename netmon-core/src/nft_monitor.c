@@ -34,7 +34,8 @@ struct device_stat {
     uint64_t down_speed;
     uint64_t total_up;
     uint64_t total_down;
-    uint32_t last_seen_gen;
+    uint32_t last_up_seen_gen;
+    uint32_t last_down_seen_gen;
 };
 
 static struct device_stat devices[MAX_DEVICES];
@@ -224,10 +225,11 @@ static int set_elem_cb(const struct nlmsghdr *nlh, void *data) {
         if (found == -1) found = add_device((const uint8_t *)val, len);
 
         if (found != -1) {
-            devices[found].last_seen_gen = current_gen;
             if (ctx->is_download) {
+                devices[found].last_down_seen_gen = current_gen;
                 update_stat(bytes, &devices[found].last_down_bytes, &devices[found].down_speed, &devices[found].total_down);
             } else {
+                devices[found].last_up_seen_gen = current_gen;
                 update_stat(bytes, &devices[found].last_up_bytes, &devices[found].up_speed, &devices[found].total_up);
             }
         }
@@ -273,10 +275,10 @@ void update_nft_stats() {
     fetch_set_stats(3, 1);
 
     for (int i = 0; i < device_count; i++) {
-        if (devices[i].last_seen_gen != current_gen) {
+        if (devices[i].last_up_seen_gen != current_gen)
             devices[i].up_speed = 0;
+        if (devices[i].last_down_seen_gen != current_gen)
             devices[i].down_speed = 0;
-        }
     }
 
     now_ms = monotonic_ms();
@@ -557,7 +559,8 @@ void load_stats() {
             devices[idx].total_down = (blobmsg_type(dtb[2]) == BLOBMSG_TYPE_INT64) ? blobmsg_get_u64(dtb[2]) : blobmsg_get_u32(dtb[2]);
             devices[idx].last_up_bytes = 0;
             devices[idx].last_down_bytes = 0;
-            devices[idx].last_seen_gen = current_gen;
+            devices[idx].last_up_seen_gen = current_gen;
+            devices[idx].last_down_seen_gen = current_gen;
             recovered++;
         } else {
             fprintf(stderr, "netmon: [LOAD] Failed to add device (MAX_DEVICES reached?)\n");
