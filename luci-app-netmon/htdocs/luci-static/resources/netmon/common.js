@@ -639,7 +639,11 @@ function makeHostCell(item, opts) {
 	var metaItems = [];
 
 	if (opts.showStatus === true)
-		metaItems.push(E('span', { 'class': 'netmon-host-state ' + (item.isOnline ? 'netmon-host-state-online' : 'netmon-host-state-offline') }, item.isOnline ? _('Online') : _('Offline')));
+		metaItems.push(E('span', {
+			'class': 'netmon-host-state ' + (item.isOnline ? 'netmon-host-state-online' : 'netmon-host-state-offline'),
+			'title': item.isOnline ? _('Online') : _('Offline'),
+			'aria-label': item.isOnline ? _('Online') : _('Offline')
+		}));
 
 	if (item.vendor && !(item.isRandomized && item.vendor === _('Randomized')))
 		metaItems.push(E('span', { 'class': 'netmon-host-vendor' }, item.vendor));

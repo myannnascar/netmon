@@ -30,6 +30,11 @@ return view.extend({
 		o.value('yearly', _('Yearly'));
 		o.default = 'daily';
 
+		o = s.option(form.DynamicList, 'extra_iface', _('Extra accounting interfaces'),
+			_('Also count traffic on proxy or tunnel interfaces. Use this for daed dae0 and similar TUN devices.'));
+		o.default = ['dae0', 'nikki', 'mihomo', 'tun0'];
+		o.placeholder = 'dae0';
+
 		s = m.section(form.NamedSection, 'main', 'netmon', _('Data Management'));
 
 		o = s.option(form.Button, '_clear', _('Clear stats'),

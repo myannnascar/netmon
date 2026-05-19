@@ -76,7 +76,7 @@ return view.extend({
 			var thTotalDown = E('th', { 'class': 'th netmon-th-sort netmon-col-number' }, [ _('Period down'), iconTotalDown ]);
 
 			var summary = E('div', { 'class': 'netmon-metric-grid' }, [
-				netmon.makeMetric('netmon-online-count', _('Online'), '#0d9488', '\u25CF'),
+				netmon.makeMetric('netmon-online-count', _('Online'), '#0d9488', '\u25CF', 'netmon-metric-online'),
 				netmon.makeMetric('netmon-up-speed', _('Upload speed'), '#2563eb', '\u2191', 'netmon-metric-up'),
 				netmon.makeMetric('netmon-down-speed', _('Download speed'), '#059669', '\u2193', 'netmon-metric-down')
 			]);
